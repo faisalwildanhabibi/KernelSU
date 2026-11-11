@@ -206,4 +206,19 @@ static const __u32 KSU_IOCTL_GET_SULOG_FD = _IOW('K', 20, struct ksu_get_sulog_f
 static const __u32 KSU_IOCTL_DISABLE_ESCAPE_TO_ROOT = _IO('K', 21);
 static const __u32 KSU_IOCTL_LOOKUP_SYMBOLS = _IOW('K', 22, struct ksu_lookup_symbols_cmd);
 
+enum {
+    DYNAMIC_MANAGER_OP_SET = 0,
+    DYNAMIC_MANAGER_OP_GET = 1,
+    DYNAMIC_MANAGER_OP_WIPE = 2,
+    DYNAMIC_MANAGER_OP_SET_SYNCHRONOUS = 3,
+};
+
+struct ksu_dynamic_manager_cmd {
+    __u8 operation;
+    unsigned int size;
+    __u8 hash[64];
+};
+
+static const __u32 KSU_IOCTL_DYNAMIC_MANAGER = _IOC(_IOC_READ | _IOC_WRITE, 'K', 103, 0);
+
 #endif

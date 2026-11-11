@@ -20,6 +20,7 @@
 #endif
 
 #include "manager/apk_sign.h"
+#include "feature/dynamic_manager.h"
 #include "uapi/app_profile.h"
 #include "klog.h" // IWYU pragma: keep
 
@@ -325,5 +326,12 @@ int get_pkg_from_apk_dir_path(char *pkg, const char *path)
 
 bool is_manager_apk(char *path)
 {
-    return check_v2_signature(path, EXPECTED_SIZE, EXPECTED_HASH);
+    if (check_v2_signature(path, EXPECTED_SIZE, EXPECTED_HASH))
+        return true;
+
+    if (ksu_is_dynamic_manager_enabled()) {
+        return check_v2_signature(path, ksu_get_dynamic_manager_size(), ksu_get_dynamic_manager_hash());
+    }
+
+    return false;
 }
