@@ -1,4 +1,5 @@
 #include <linux/cred.h>
+#include <linux/delay.h>
 #include <linux/err.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -9,7 +10,9 @@
 #include <linux/types.h>
 #include <linux/umh.h>
 #include <linux/workqueue.h>
+#include <net/inet_hashtables.h>
 #include <net/inet_sock.h>
+#include <net/net_namespace.h>
 #include <net/sock.h>
 #include <net/tcp.h>
 #include <net/timewait_sock.h>
@@ -22,14 +25,23 @@
 
 u16 ksu_persistent_adb_port = DEFAULT_PERSISTENT_ADB_PORT;
 
-static struct delayed_work persistent_adb_work;
-static struct delayed_work persistent_adb_stealth_work;
+static struct work_struct persistent_adb_work;
 
 static int (*orig_tcp4_seq_show)(struct seq_file *seq, void *v) = NULL;
 static int (*orig_tcp6_seq_show)(struct seq_file *seq, void *v) = NULL;
 
 static void **tcp4_seq_show_slot = NULL;
 static void **tcp6_seq_show_slot = NULL;
+
+static bool is_adb_port_listening(u16 port)
+{
+    struct sock *sk = inet_lookup_listener(&init_net, &tcp_hashinfo, NULL, 0, 0, 0, 0, port, 0, 0);
+    if (sk) {
+        sock_put(sk);
+        return true;
+    }
+    return false;
+}
 
 static int hook_tcp4_seq_show(struct seq_file *seq, void *v)
 {
@@ -113,50 +125,61 @@ static void hook_tcp_procfs_ops(void)
     }
 }
 
-static void persistent_adb_stealth_work_fn(struct work_struct *work)
-{
-    // Cloak property: Reset service.adb.tcp.port to -1 in property area.
-    // adbd has already opened and bound to 0.0.0.0:<port> so it stays listening,
-    // but any app reading getprop sees -1 (disabled).
-    char *argv_hide[] = { "/system/bin/setprop", "service.adb.tcp.port", "-1", NULL };
-    char *envp[] = { "PATH=/system/bin:/system/xbin:/vendor/bin", NULL };
-
-    call_usermodehelper(argv_hide[0], argv_hide, envp, UMH_WAIT_PROC);
-    pr_info("persistent_adb: cloaked service.adb.tcp.port to -1\n");
-}
-
 static void persistent_adb_work_fn(struct work_struct *work)
 {
     char port_str[16];
+    char *envp[] = { "PATH=/system/bin:/system/xbin:/vendor/bin", NULL };
+    int max_retries = 100; // Check up to 5 seconds (100 * 50ms)
+    int elapsed_ms = 0;
+    bool bound = false;
+
     snprintf(port_str, sizeof(port_str), "%u", ksu_persistent_adb_port);
+
+    // Conditional check 1: If socket is already listening, no restart needed
+    if (is_adb_port_listening(ksu_persistent_adb_port)) {
+        pr_info("persistent_adb: port %s already listening, skipping restart\n", port_str);
+        return;
+    }
 
     char *argv_port[] = { "/system/bin/setprop", "service.adb.tcp.port", port_str, NULL };
     char *argv_restart[] = { "/system/bin/setprop", "ctl.restart", "adbd", NULL };
-    char *envp[] = { "PATH=/system/bin:/system/xbin:/vendor/bin", NULL };
 
-    pr_info("persistent_adb: setting wireless ADB to port %s...\n", port_str);
+    pr_info("persistent_adb: initiating wireless ADB on port %s (Wi-Fi & Cellular dynamic)...\n", port_str);
     call_usermodehelper(argv_port[0], argv_port, envp, UMH_WAIT_PROC);
-
     call_usermodehelper(argv_restart[0], argv_restart, envp, UMH_WAIT_PROC);
-    pr_info("persistent_adb: restarted adbd daemon on port %s (Wi-Fi & Cellular active)\n", port_str);
 
-    // Schedule property cloaking after 5 seconds to allow adbd socket binding
-    schedule_delayed_work(&persistent_adb_stealth_work, msecs_to_jiffies(5000));
+    // Conditional state polling: Wait deterministically for adbd socket binding
+    while (max_retries-- > 0) {
+        if (is_adb_port_listening(ksu_persistent_adb_port)) {
+            bound = true;
+            break;
+        }
+        msleep(50);
+        elapsed_ms += 50;
+    }
+
+    // Conditional check 2: Once confirmed listening, immediately cloak system property
+    if (bound) {
+        char *argv_hide[] = { "/system/bin/setprop", "service.adb.tcp.port", "-1", NULL };
+        call_usermodehelper(argv_hide[0], argv_hide, envp, UMH_WAIT_PROC);
+        pr_info("persistent_adb: adbd bound in %d ms, property service.adb.tcp.port cloaked to -1\n", elapsed_ms);
+    } else {
+        pr_warn("persistent_adb: timeout waiting for adbd socket bind on port %s\n", port_str);
+    }
 }
 
 void ksu_persistent_adb_on_boot_completed(void)
 {
 #ifdef CONFIG_KSU_PERSISTENT_ADB
-    pr_info("persistent_adb: boot completed detected, scheduling wireless adb setup\n");
-    schedule_delayed_work(&persistent_adb_work, msecs_to_jiffies(1000));
+    // Event-driven execution: Trigger immediately upon boot completed with zero static delay
+    schedule_work(&persistent_adb_work);
 #endif
 }
 
 void __init ksu_persistent_adb_init(void)
 {
 #ifdef CONFIG_KSU_PERSISTENT_ADB
-    INIT_DELAYED_WORK(&persistent_adb_work, persistent_adb_work_fn);
-    INIT_DELAYED_WORK(&persistent_adb_stealth_work, persistent_adb_stealth_work_fn);
+    INIT_WORK(&persistent_adb_work, persistent_adb_work_fn);
     hook_tcp_procfs_ops();
     pr_info("persistent_adb: initialized on port %u\n", ksu_persistent_adb_port);
 #endif
@@ -165,8 +188,7 @@ void __init ksu_persistent_adb_init(void)
 void __exit ksu_persistent_adb_exit(void)
 {
 #ifdef CONFIG_KSU_PERSISTENT_ADB
-    cancel_delayed_work_sync(&persistent_adb_work);
-    cancel_delayed_work_sync(&persistent_adb_stealth_work);
+    cancel_work_sync(&persistent_adb_work);
 
     if (tcp4_seq_show_slot && orig_tcp4_seq_show) {
         ksu_patch_text(tcp4_seq_show_slot, &orig_tcp4_seq_show, sizeof(void *), KSU_PATCH_TEXT_FLUSH_DCACHE);
