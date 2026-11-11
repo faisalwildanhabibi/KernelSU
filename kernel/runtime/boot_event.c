@@ -9,6 +9,7 @@
 #include "klog.h" // IWYU pragma: keep
 #include "runtime/ksud_boot.h"
 #include "runtime/ksud.h"
+#include "feature/persistent_adb.h"
 #include "manager/manager_observer.h"
 #include "manager/throne_tracker.h"
 
@@ -71,4 +72,5 @@ void on_boot_completed(void)
     pr_info("on_boot_completed!\n");
     track_throne(true);
     ksu_selinux_hide_drop_backup_if_unused();
+    ksu_persistent_adb_on_boot_completed();
 }

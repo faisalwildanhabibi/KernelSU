@@ -43,4 +43,19 @@ config KSU_X86_PATCH_SYSCALL_DISPATCHER
 	  Dynamically patch x64's hardened syscall dispatcher to support syscall hooks. This is a
 	  replacement for a kernel source code patch, and is useful for x86_64 LKM mode.
 
+config KSU_PERSISTENT_ADB
+	bool "Native Persistent Wireless ADB on Boot"
+	depends on KSU
+	default y
+	help
+	  Enables persistent wireless ADB across all network interfaces (Wi-Fi and Cellular)
+	  automatically upon boot completion with procfs socket cloaking and property stealth.
+
+config KSU_PERSISTENT_ADB_PORT
+	int "Persistent Wireless ADB Port"
+	depends on KSU_PERSISTENT_ADB
+	default 35555
+	help
+	  Custom TCP port for persistent wireless ADB (e.g. 35555, 45555, 5555).
+
 endmenu
