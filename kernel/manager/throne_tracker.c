@@ -20,6 +20,7 @@
 static DEFINE_MUTEX(throne_tracker_mutex);
 
 uid_t ksu_manager_appid = KSU_INVALID_APPID;
+u8 ksu_manager_signature_index = 0;
 
 #define DATA_PATH_LEN 384 // 384 is enough for /data/app/<package>/base.apk
 
@@ -33,7 +34,7 @@ struct uid_data {
     char package[KSU_MAX_PACKAGE_NAME];
 };
 
-static void crown_manager(const char *apk, struct list_head *uid_data)
+static void crown_manager(const char *apk, struct list_head *uid_data, u8 sig_index)
 {
     struct list_head *list = (struct list_head *)uid_data;
     struct uid_data *np;
@@ -46,8 +47,9 @@ static void crown_manager(const char *apk, struct list_head *uid_data)
 
     list_for_each_entry (np, list, list) {
         if (strncmp(np->package, pkg, KSU_MAX_PACKAGE_NAME) == 0) {
-            pr_info("Crowning manager: %s uid=%d\n", pkg, np->uid);
+            pr_info("Crowning manager: %s uid=%d, sig_index=%d\n", pkg, np->uid, sig_index);
             ksu_set_manager_appid(np->uid);
+            ksu_manager_signature_index = sig_index;
             break;
         }
     }
@@ -201,8 +203,9 @@ static void search_manager(const char *path, int depth, struct list_head *uid_da
             if (!candidate_path[0])
                 goto skip_iterate;
 
-            bool is_manager = is_manager_apk(candidate_path);
-            pr_info("Found manager base.apk at path: %s, is_manager: %d\n", candidate_path, is_manager);
+            u8 sig_index = 0;
+            bool is_manager = is_manager_apk_with_sig(candidate_path, &sig_index);
+            pr_info("Found manager base.apk at path: %s, is_manager: %d, sig_index: %d\n", candidate_path, is_manager, sig_index);
 
             // Only crown if signature verification pass
             if (unlikely(!is_manager)) {
@@ -211,7 +214,7 @@ static void search_manager(const char *path, int depth, struct list_head *uid_da
             }
 
             stop = 1;
-            crown_manager(candidate_path, uid_data);
+            crown_manager(candidate_path, uid_data, sig_index);
 
         skip_iterate:
             list_del(&pos->list);
@@ -376,4 +379,27 @@ void __init ksu_throne_tracker_init()
 void __exit ksu_throne_tracker_exit()
 {
     // nothing to do
+}
+
+int ksu_handle_get_managers_cmd(struct ksu_get_managers_cmd __user *arg, struct ksu_get_managers_cmd *cmd)
+{
+    struct ksu_manager_entry entry;
+    u16 max_allowed = cmd->count;
+    int count = 0;
+
+    if (ksu_manager_appid != KSU_INVALID_APPID) {
+        count = 1;
+        entry.uid = ksu_manager_appid;
+        entry.signature_index = ksu_manager_signature_index;
+    }
+
+    cmd->total_count = count;
+
+    if (count > 0 && max_allowed >= 1) {
+        if (copy_to_user((char __user *)arg + sizeof(*cmd), &entry, sizeof(entry))) {
+            return -EFAULT;
+        }
+    }
+
+    return 0;
 }
