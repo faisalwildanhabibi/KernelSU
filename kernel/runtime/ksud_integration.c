@@ -677,3 +677,9 @@ void __exit ksu_ksud_exit()
         free_module_rc();
     }
 }
+
+#ifdef CONFIG_KSU_SUSFS
+bool ksu_is_input_hook_enabled = true;
+bool ksu_is_init_rc_hook_enabled = true;
+bool ksu_susfs_control_node_suppress = false;
+#endif

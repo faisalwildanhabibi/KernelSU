@@ -43,4 +43,12 @@ config KSU_X86_PATCH_SYSCALL_DISPATCHER
 	  Dynamically patch x64's hardened syscall dispatcher to support syscall hooks. This is a
 	  replacement for a kernel source code patch, and is useful for x86_64 LKM mode.
 
+config KSU_SUSFS
+	bool "KernelSU SuSFS In-Tree Integration & Control Node Suppression"
+	depends on KSU
+	default y
+	help
+	  Enable SuSFS integration with KernelSU, providing glue symbols
+	  and control node suppression handling.
+
 endmenu
