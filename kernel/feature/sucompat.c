@@ -186,6 +186,14 @@ static long ksu_handle_execve_sucompat_common(const char __user **filename_user,
     if (likely(memcmp(path, su_path, sizeof(su_path))))
         goto do_orig_execve;
 
+    old_cred = override_creds(ksu_cred);
+    if (!is_ksud_exists()) {
+        revert_creds(old_cred);
+        pr_info("no ksud found, don't process execve for su!\n");
+        return -EINVAL;
+    }
+    revert_creds(old_cred);
+
     pr_info("sys_execve su found\n");
 
     tmp_fd = get_unused_fd_flags(O_CLOEXEC);
