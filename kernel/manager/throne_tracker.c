@@ -243,7 +243,7 @@ void track_throne(bool prune_only)
 {
     mutex_lock(&throne_tracker_mutex);
     const struct cred *old_cred = override_creds(ksu_cred);
-    struct file *fp = filp_open(SYSTEM_PACKAGES_LIST_PATH, O_RDONLY, 0);
+    struct file *fp = ksu_filp_open_nonotify(SYSTEM_PACKAGES_LIST_PATH, O_RDONLY | O_NOATIME);
     if (IS_ERR(fp)) {
         pr_err("%s: open " SYSTEM_PACKAGES_LIST_PATH " failed: %ld\n", __func__, PTR_ERR(fp));
         goto out_revert_cred;

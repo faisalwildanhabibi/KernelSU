@@ -148,13 +148,17 @@ void __init ksu_supercalls_init(void)
 {
     int rc;
 
+#ifdef CONFIG_KSU_DEBUG
     ksu_supercall_dump_commands();
+#endif
 
     rc = register_kprobe(&reboot_kp);
     if (rc) {
         pr_err("reboot kprobe failed: %d\n", rc);
+#ifdef CONFIG_KSU_DEBUG
     } else {
         pr_info("reboot kprobe registered successfully\n");
+#endif
     }
 }
 

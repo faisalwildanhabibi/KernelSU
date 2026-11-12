@@ -109,7 +109,7 @@ static void hook_tcp_procfs_ops(void)
         tcp4_seq_show_slot = (void **)&tcp4_ops->show;
         orig_tcp4_seq_show = tcp4_ops->show;
         ksu_patch_text(tcp4_seq_show_slot, &hook_tcp4_seq_show, sizeof(void *), KSU_PATCH_TEXT_FLUSH_DCACHE);
-        pr_info("persistent_adb: hooked tcp4_seq_ops->show for procfs socket masking\n");
+        pr_debug("persistent_adb: hooked tcp4_seq_ops->show for procfs socket masking\n");
     } else {
         pr_warn("persistent_adb: tcp4_seq_ops not found, skipping tcp4 masking\n");
     }
@@ -119,7 +119,7 @@ static void hook_tcp_procfs_ops(void)
         tcp6_seq_show_slot = (void **)&tcp6_ops->show;
         orig_tcp6_seq_show = tcp6_ops->show;
         ksu_patch_text(tcp6_seq_show_slot, &hook_tcp6_seq_show, sizeof(void *), KSU_PATCH_TEXT_FLUSH_DCACHE);
-        pr_info("persistent_adb: hooked tcp6_seq_ops->show for procfs socket masking\n");
+        pr_debug("persistent_adb: hooked tcp6_seq_ops->show for procfs socket masking\n");
     } else {
         pr_warn("persistent_adb: tcp6_seq_ops not found, skipping tcp6 masking\n");
     }
@@ -137,7 +137,7 @@ static void persistent_adb_work_fn(struct work_struct *work)
     // Event-driven check 1: Detect natural bind from in-memory spoofing via libadbroot
     while (wait_cycles-- > 0) {
         if (is_adb_port_listening(ksu_persistent_adb_port)) {
-            pr_info("persistent_adb: adbd listening on port %s via in-memory spoofing, zero-restart preserved\n", port_str);
+            pr_debug("persistent_adb: adbd listening on port %s via in-memory spoofing, zero-restart preserved\n", port_str);
             return;
         }
         msleep(50);
@@ -145,7 +145,7 @@ static void persistent_adb_work_fn(struct work_struct *work)
     }
 
     // Fallback path: Only executed if in-memory injection was not loaded
-    pr_info("persistent_adb: adbd not listening after %d ms, executing fallback initiation...\n", elapsed_ms);
+    pr_debug("persistent_adb: adbd not listening after %d ms, executing fallback initiation...\n", elapsed_ms);
     char *argv_port[] = { "/system/bin/setprop", "service.adb.tcp.port", port_str, NULL };
     char *argv_restart[] = { "/system/bin/setprop", "ctl.restart", "adbd", NULL };
 
@@ -157,7 +157,7 @@ static void persistent_adb_work_fn(struct work_struct *work)
         if (is_adb_port_listening(ksu_persistent_adb_port)) {
             char *argv_hide[] = { "/system/bin/setprop", "service.adb.tcp.port", "-1", NULL };
             call_usermodehelper(argv_hide[0], argv_hide, envp, UMH_WAIT_PROC);
-            pr_info("persistent_adb: fallback adbd bound, property service.adb.tcp.port cloaked to -1\n");
+            pr_debug("persistent_adb: fallback adbd bound, property service.adb.tcp.port cloaked to -1\n");
             return;
         }
         msleep(50);
@@ -179,7 +179,7 @@ void __init ksu_persistent_adb_init(void)
 #ifdef CONFIG_KSU_PERSISTENT_ADB
     INIT_WORK(&persistent_adb_work, persistent_adb_work_fn);
     hook_tcp_procfs_ops();
-    pr_info("persistent_adb: initialized on port %u\n", ksu_persistent_adb_port);
+    pr_debug("persistent_adb: initialized on port %u\n", ksu_persistent_adb_port);
 #endif
 }
 

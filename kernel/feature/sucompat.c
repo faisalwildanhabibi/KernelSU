@@ -43,7 +43,7 @@ static int su_compat_feature_set(u64 value)
 {
     bool enable = value != 0;
     ksu_su_compat_enabled = enable;
-    pr_info("su_compat: set to %d\n", enable);
+    pr_debug("su_compat: set to %d\n", enable);
     return 0;
 }
 
@@ -98,7 +98,7 @@ long ksu_handle_faccessat_sucompat(int orig_nr, struct pt_regs *regs)
     if (unlikely(!memcmp(path, su_path, sizeof(su_path)))) {
         old_cred = override_creds(ksu_cred);
         if (is_ksud_exists()) {
-            pr_info("faccessat su->ksud!\n");
+            pr_debug("faccessat su->ksud!\n");
             orig_filename = *filename_user;
             *filename_user = ksud_user_path();
             ret = ksu_syscall_table[orig_nr](regs);
@@ -133,7 +133,7 @@ long ksu_handle_stat_sucompat(int orig_nr, struct pt_regs *regs)
     if (unlikely(!memcmp(path, su_path, sizeof(su_path)))) {
         old_cred = override_creds(ksu_cred);
         if (is_ksud_exists()) {
-            pr_info("newfstatat su->ksud!\n");
+            pr_debug("newfstatat su->ksud!\n");
             orig_filename = *filename_user;
             *filename_user = ksud_user_path();
             ret = ksu_syscall_table[orig_nr](regs);
@@ -186,7 +186,7 @@ static long ksu_handle_execve_sucompat_common(const char __user **filename_user,
     if (likely(memcmp(path, su_path, sizeof(su_path))))
         goto do_orig_execve;
 
-    pr_info("sys_execve su found\n");
+    pr_debug("sys_execve su found\n");
 
     tmp_fd = get_unused_fd_flags(O_CLOEXEC);
     if (tmp_fd < 0) {

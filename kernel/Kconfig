@@ -65,4 +65,18 @@ config KSU_SUSFS
 	help
 	  Enable in-tree compatibility for SuSFS (Suspicious Filesystem) hooks in kernel.
 
+config KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS
+	bool "Hide KernelSU and SuSFS symbols from kallsyms"
+	depends on KSU_SUSFS
+	default y
+	help
+	  Hide KernelSU, SuSFS and supercall symbols from /proc/kallsyms.
+
+config KSU_SUSFS_AVC_LOG_SPOOFING
+	bool "Spoof or suppress SELinux AVC audit denial logs"
+	depends on KSU_SUSFS
+	default y
+	help
+	  Prevent SELinux audit denied logs for root and hidden processes.
+
 endmenu

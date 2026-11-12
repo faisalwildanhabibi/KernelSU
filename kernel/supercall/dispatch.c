@@ -1045,7 +1045,9 @@ long ksu_supercall_handle_ioctl(const struct file *filp, unsigned int cmd, void 
             // Check permission first
             if (ksu_ioctl_handlers[i].perm_check && !ksu_ioctl_handlers[i].perm_check() &&
                 !(ksu_ioctl_handlers[i].allow_su_session && ksu_is_su_session_fd(filp))) {
+#ifdef CONFIG_KSU_DEBUG
                 pr_warn_ratelimited("ksu ioctl: permission denied for cmd=0x%x uid=%d\n", cmd, current_uid().val);
+#endif
                 return -EPERM;
             }
             // Execute handler
@@ -1053,10 +1055,13 @@ long ksu_supercall_handle_ioctl(const struct file *filp, unsigned int cmd, void 
         }
     }
 
+#ifdef CONFIG_KSU_DEBUG
     pr_warn_ratelimited("ksu ioctl: unsupported command 0x%x\n", cmd);
+#endif
     return -ENOTTY;
 }
 
+#ifdef CONFIG_KSU_DEBUG
 void __init ksu_supercall_dump_commands(void)
 {
     int i;
@@ -1066,6 +1071,7 @@ void __init ksu_supercall_dump_commands(void)
         pr_info("  %-18s = 0x%08x\n", ksu_ioctl_handlers[i].name, ksu_ioctl_handlers[i].cmd);
     }
 }
+#endif
 
 void ksu_supercall_cleanup_state(void)
 {

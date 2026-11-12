@@ -12,7 +12,11 @@ bool always_allow(void);
 bool allowed_for_su(void);
 
 long ksu_supercall_handle_ioctl(const struct file *filp, unsigned int cmd, void __user *argp);
+#ifdef CONFIG_KSU_DEBUG
 void ksu_supercall_dump_commands(void);
+#else
+static inline void ksu_supercall_dump_commands(void) {}
+#endif
 void ksu_supercall_cleanup_state(void);
 
 #endif // __KSU_H_SUPERCALL_INTERNAL
