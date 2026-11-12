@@ -56,6 +56,11 @@ static void stop_execve_hook();
 
 static struct work_struct stop_input_hook_work;
 
+#ifdef CONFIG_KSU_SUSFS
+DEFINE_STATIC_KEY_TRUE(ksu_is_input_hook_enabled);
+DEFINE_STATIC_KEY_TRUE(ksu_is_init_rc_hook_enabled);
+#endif
+
 #define MAX_ARG_STRINGS 0x7FFFFFFF
 struct user_arg_ptr {
 #ifdef CONFIG_COMPAT
