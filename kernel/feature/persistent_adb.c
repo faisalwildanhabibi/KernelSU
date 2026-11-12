@@ -129,43 +129,41 @@ static void persistent_adb_work_fn(struct work_struct *work)
 {
     char port_str[16];
     char *envp[] = { "PATH=/system/bin:/system/xbin:/vendor/bin", NULL };
-    int max_retries = 100; // Check up to 5 seconds (100 * 50ms)
+    int wait_cycles = 60; // Up to 3 seconds (60 * 50ms) for in-memory adbd bind
     int elapsed_ms = 0;
-    bool bound = false;
 
     snprintf(port_str, sizeof(port_str), "%u", ksu_persistent_adb_port);
 
-    // Conditional check 1: If socket is already listening, no restart needed
-    if (is_adb_port_listening(ksu_persistent_adb_port)) {
-        pr_info("persistent_adb: port %s already listening, skipping restart\n", port_str);
-        return;
-    }
-
-    char *argv_port[] = { "/system/bin/setprop", "service.adb.tcp.port", port_str, NULL };
-    char *argv_restart[] = { "/system/bin/setprop", "ctl.restart", "adbd", NULL };
-
-    pr_info("persistent_adb: initiating wireless ADB on port %s (Wi-Fi & Cellular dynamic)...\n", port_str);
-    call_usermodehelper(argv_port[0], argv_port, envp, UMH_WAIT_PROC);
-    call_usermodehelper(argv_restart[0], argv_restart, envp, UMH_WAIT_PROC);
-
-    // Conditional state polling: Wait deterministically for adbd socket binding
-    while (max_retries-- > 0) {
+    // Event-driven check 1: Detect natural bind from in-memory spoofing via libadbroot
+    while (wait_cycles-- > 0) {
         if (is_adb_port_listening(ksu_persistent_adb_port)) {
-            bound = true;
-            break;
+            pr_info("persistent_adb: adbd listening on port %s via in-memory spoofing, zero-restart preserved\n", port_str);
+            return;
         }
         msleep(50);
         elapsed_ms += 50;
     }
 
-    // Conditional check 2: Once confirmed listening, immediately cloak system property
-    if (bound) {
-        char *argv_hide[] = { "/system/bin/setprop", "service.adb.tcp.port", "-1", NULL };
-        call_usermodehelper(argv_hide[0], argv_hide, envp, UMH_WAIT_PROC);
-        pr_info("persistent_adb: adbd bound in %d ms, property service.adb.tcp.port cloaked to -1\n", elapsed_ms);
-    } else {
-        pr_warn("persistent_adb: timeout waiting for adbd socket bind on port %s\n", port_str);
+    // Fallback path: Only executed if in-memory injection was not loaded
+    pr_info("persistent_adb: adbd not listening after %d ms, executing fallback initiation...\n", elapsed_ms);
+    char *argv_port[] = { "/system/bin/setprop", "service.adb.tcp.port", port_str, NULL };
+    char *argv_restart[] = { "/system/bin/setprop", "ctl.restart", "adbd", NULL };
+
+    call_usermodehelper(argv_port[0], argv_port, envp, UMH_WAIT_PROC);
+    call_usermodehelper(argv_restart[0], argv_restart, envp, UMH_WAIT_PROC);
+
+    wait_cycles = 60;
+    while (wait_cycles-- > 0) {
+        if (is_adb_port_listening(ksu_persistent_adb_port)) {
+            char *argv_hide[] = { "/system/bin/setprop", "service.adb.tcp.port", "-1", NULL };
+            call_usermodehelper(argv_hide[0], argv_hide, envp, UMH_WAIT_PROC);
+            pr_info("persistent_adb: fallback adbd bound, property service.adb.tcp.port cloaked to -1\n");
+            return;
+        }
+        msleep(50);
     }
+
+    pr_warn("persistent_adb: timeout waiting for adbd socket bind on port %s\n", port_str);
 }
 
 void ksu_persistent_adb_on_boot_completed(void)
