@@ -17,6 +17,7 @@
 #include "ksu.h"
 #include "runtime/ksud_boot.h"
 #include "feature/kernel_umount.h"
+#include "feature/dynamic_manager.h"
 #include "manager/manager_identity.h"
 #include "selinux/selinux.h"
 #include "infra/file_wrapper.h"
@@ -802,6 +803,59 @@ out:
     return ret;
 }
 
+static int do_dynamic_manager(void __user *arg)
+{
+#ifdef CONFIG_KSU_DISABLE_MANAGER
+    return -EOPNOTSUPP;
+#else
+    struct ksu_dynamic_manager_cmd cmd;
+
+    if (copy_from_user(&cmd, arg, sizeof(cmd))) {
+        pr_err("dynamic_manager: copy_from_user failed\n");
+        return -EFAULT;
+    }
+
+    if (cmd.operation != DYNAMIC_MANAGER_OP_GET && !only_root()) {
+        pr_warn("dynamic_manager: write operation requires root\n");
+        return -EPERM;
+    }
+
+    int ret = ksu_handle_dynamic_manager(&cmd);
+    if (ret)
+        return ret;
+
+    if (cmd.operation == DYNAMIC_MANAGER_OP_GET && copy_to_user(arg, &cmd, sizeof(cmd))) {
+        pr_err("dynamic_manager: copy_to_user failed\n");
+        return -EFAULT;
+    }
+
+    return 0;
+#endif
+}
+
+static int do_get_managers(void __user *arg)
+{
+#ifdef CONFIG_KSU_DISABLE_MANAGER
+    return -EOPNOTSUPP;
+#else
+    struct ksu_get_managers_cmd cmd;
+
+    if (copy_from_user(&cmd, arg, sizeof(struct ksu_get_managers_cmd))) {
+        return -EFAULT;
+    }
+
+    int ret = ksu_handle_get_managers_cmd(arg, &cmd);
+    if (ret)
+        return ret;
+
+    if (copy_to_user(arg, &cmd, sizeof(struct ksu_get_managers_cmd))) {
+        return -EFAULT;
+    }
+
+    return 0;
+#endif
+}
+
 // IOCTL handlers mapping table
 // clang-format off
 static const struct ksu_ioctl_cmd_map ksu_ioctl_handlers[] = {
@@ -956,6 +1010,18 @@ static const struct ksu_ioctl_cmd_map ksu_ioctl_handlers[] = {
         .name = "LOOKUP_SYMBOLS",
         .handler = do_lookup_symbols,
         .perm_check = only_root
+    },
+    {
+        .cmd = KSU_IOCTL_DYNAMIC_MANAGER,
+        .name = "DYNAMIC_MANAGER",
+        .handler = do_dynamic_manager,
+        .perm_check = manager_or_root
+    },
+    {
+        .cmd = KSU_IOCTL_GET_MANAGERS,
+        .name = "GET_MANAGERS",
+        .handler = do_get_managers,
+        .perm_check = manager_or_root
     },
     {
         .cmd = 0,

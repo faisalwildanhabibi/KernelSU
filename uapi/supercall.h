@@ -206,4 +206,33 @@ static const __u32 KSU_IOCTL_GET_SULOG_FD = _IOW('K', 20, struct ksu_get_sulog_f
 static const __u32 KSU_IOCTL_DISABLE_ESCAPE_TO_ROOT = _IO('K', 21);
 static const __u32 KSU_IOCTL_LOOKUP_SYMBOLS = _IOW('K', 22, struct ksu_lookup_symbols_cmd);
 
+enum {
+    DYNAMIC_MANAGER_OP_SET = 0,
+    DYNAMIC_MANAGER_OP_GET = 1,
+    DYNAMIC_MANAGER_OP_WIPE = 2,
+    DYNAMIC_MANAGER_OP_SET_SYNCHRONOUS = 3,
+};
+
+#define KSU_SIGNATURE_INDEX_DYNAMIC_MANAGER 255
+
+struct ksu_dynamic_manager_cmd {
+    __u8 operation;
+    unsigned int size;
+    __u8 hash[64];
+};
+
+struct ksu_manager_entry {
+    __u32 uid;
+    __u8 signature_index;
+} __attribute__((packed));
+
+struct ksu_get_managers_cmd {
+    __u16 count; // Input / Output: number of managers in array
+    __u16 total_count; // Output: total number of managers in requested list
+    struct ksu_manager_entry managers[]; // Output: Array of active manager
+} __attribute__((packed));
+
+static const __u32 KSU_IOCTL_DYNAMIC_MANAGER = _IOC(_IOC_READ | _IOC_WRITE, 'K', 103, 0);
+static const __u32 KSU_IOCTL_GET_MANAGERS = _IOC(_IOC_READ | _IOC_WRITE, 'K', 105, 0);
+
 #endif

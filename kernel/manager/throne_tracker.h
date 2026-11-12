@@ -21,6 +21,10 @@ void ksu_throne_tracker_init();
 void ksu_throne_tracker_exit();
 
 void track_throne(bool prune_only);
+
+struct ksu_get_managers_cmd;
+int ksu_handle_get_managers_cmd(struct ksu_get_managers_cmd __user *arg, struct ksu_get_managers_cmd *cmd);
+extern u8 ksu_manager_signature_index;
 #endif
 
 #endif
