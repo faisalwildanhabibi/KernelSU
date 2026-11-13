@@ -107,6 +107,10 @@ static inline void ksu_mark_manager(u32 uid)
 extern bool is_manager(void);
 extern bool ksu_is_manager_appid(u16 appid);
 extern bool ksu_is_manager_uid(u32 uid);
+extern bool ksu_has_manager(void);
+extern bool ksu_is_manager_package(const char *pkg);
+extern bool ksu_is_manager_package_in_path(const char *path);
+extern void ksu_register_manager_package(const char *pkg);
 
 static inline bool is_uid_manager(uid_t uid)
 {
@@ -138,10 +142,6 @@ extern void ksu_unregister_manager(u32 uid);
 extern void ksu_unregister_manager_by_signature_index(u8 signature_index);
 extern void ksu_unregister_all_manager(void);
 extern int ksu_get_manager_signature_index_by_appid(u16 appid);
-extern bool ksu_has_manager(void);
-extern bool ksu_is_manager_package(const char *pkg);
-extern bool ksu_is_manager_package_in_path(const char *path);
-extern void ksu_register_manager_package(const char *pkg);
 #endif
 
 #endif // __KSU_H_MANAGER_IDENTITY
