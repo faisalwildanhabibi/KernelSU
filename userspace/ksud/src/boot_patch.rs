@@ -501,6 +501,14 @@ pub struct BootPatchArgs {
     #[arg(long, default_value = "false")]
     no_install: bool,
 
+    /// Block what module loading
+    #[arg(
+        long,
+        value_name = "NAMES",
+        default_value = "vr,vklp,vklp_smaps_rollup,oplus_secure_guard,oplus_secure_guard_new,mkp"
+    )]
+    block_modules: Option<String>,
+
     #[cfg(not(target_os = "android"))]
     #[arg(long, default_value = "aarch64")]
     arch: String,
