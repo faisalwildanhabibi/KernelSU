@@ -767,8 +767,16 @@ retry:
     if (rc)
         goto out_unlock;
 
+#ifdef KSU_COMPAT_HAS_CONTEXT_ADD_HASH
+extern int context_add_hash(struct policydb *policydb, struct context *context);
+#endif
+
     // update backup sidtab first
-    rc = sidtab_context_to_sid(sidtab, &context, sid);
+#ifdef KSU_COMPAT_HAS_CONTEXT_ADD_HASH
+    rc = context_add_hash(policydb, &context);
+#endif
+    if (!rc)
+        rc = sidtab_context_to_sid(sidtab, &context, sid);
     context_destroy(&context);
     if (rc) {
         if (!orig_rc)
@@ -783,7 +791,11 @@ retry:
 
     // only sync valid contexts
     // sync to live sidtab
-    orig_rc = sidtab_context_to_sid(orig_sidtab, &orig_context, &orig_sid);
+#ifdef KSU_COMPAT_HAS_CONTEXT_ADD_HASH
+    orig_rc = context_add_hash(orig_policydb, &orig_context);
+#endif
+    if (!orig_rc)
+        orig_rc = sidtab_context_to_sid(orig_sidtab, &orig_context, &orig_sid);
     context_destroy(&orig_context);
     if (!orig_rc && orig_sid_p)
         *orig_sid_p = orig_sid;

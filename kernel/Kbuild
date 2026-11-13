@@ -204,6 +204,10 @@ ccflags-y += -DKSU_NEW_DCACHE_FLUSH=$(KSU_NEW_DCACHE_FLUSH)
 ccflags-y += -Wno-strict-prototypes -Wno-int-conversion -Wno-gcc-compat -Wno-missing-prototypes
 ccflags-y += -Wno-declaration-after-statement -Wno-unused-function
 
+ifeq ($(shell grep -q "^int context_add_hash" $(srctree)/security/selinux/ss/services.c 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_HAS_CONTEXT_ADD_HASH
+endif
+
 include $(src)/tools/code_generation/syscall_no/syscall_no.mk
 
 # Keep a new line here!! Because someone may append config
