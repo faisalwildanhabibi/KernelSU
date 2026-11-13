@@ -57,6 +57,13 @@ bool ksu_is_path_hidden(const char *path, uid_t caller_uid)
     if (!path || !path[0])
         return false;
 
+    // Never hide from system package manager / installer processes
+    if (!strncmp(current->comm, "packageinstalle", 15) ||
+        !strncmp(current->comm, "system_server", 13) ||
+        !strncmp(current->comm, "installd", 8) ||
+        !strncmp(current->comm, "dex2oat", 7))
+        return false;
+
     // 1. Cloak root infrastructure (/data/adb, /data/adb/ksu, /data/adb/modules etc.)
     if (!strncmp(path, "/data/adb", 9))
         return true;
@@ -87,8 +94,10 @@ bool ksu_is_path_hidden(const char *path, uid_t caller_uid)
         goto parse_pkg;
     }
 
-    // 5. Cloak /data/app/<pkg>...
+    // 5. Cloak /data/app/<pkg>... (never cloak staging directories)
     if (!strncmp(path, "/data/app/", 10)) {
+        if (strstr(path, "vmdl") || strstr(path, ".tmp"))
+            return false;
         if (ksu_is_manager_package_in_path(path) || ksu_is_allowlist_package_in_path(path))
             return true;
         return false;
