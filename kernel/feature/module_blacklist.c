@@ -53,8 +53,9 @@ void __init ksu_module_blacklist_init(void)
     const char *existing;
     char *merged;
     size_t existing_len;
+    const char *to_block = block_modules[0] ? block_modules : "vr,vklp,oplus_secure_guard,oplus_secure_guard_new";
 
-    if (!block_modules[0])
+    if (block_modules[0] && !strcmp(block_modules, "none"))
         return;
 
     native_blacklist = (char **)find_kernel_symbol_exact("module_blacklist");
@@ -67,7 +68,7 @@ void __init ksu_module_blacklist_init(void)
     existing_len = existing ? strlen(existing) : 0;
 
     // Merge with any existing blacklist (e.g. one set on the kernel cmdline).
-    merged = kasprintf(GFP_KERNEL, "%s%s%s", existing_len ? existing : "", existing_len ? "," : "", block_modules);
+    merged = kasprintf(GFP_KERNEL, "%s%s%s", existing_len ? existing : "", existing_len ? "," : "", to_block);
     if (!merged) {
         pr_err("module_blacklist: cannot allocate blacklist\n");
         return;
