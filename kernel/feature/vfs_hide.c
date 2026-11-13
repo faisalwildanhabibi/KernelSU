@@ -117,7 +117,7 @@ parse_pkg:
 
 long ksu_handle_stat_vfs_hide(int orig_nr, struct pt_regs *regs)
 {
-    const char __user **filename_user;
+    unsigned long addr;
     char path[256];
     long ret;
     uid_t uid = current_uid().val;
@@ -125,12 +125,12 @@ long ksu_handle_stat_vfs_hide(int orig_nr, struct pt_regs *regs)
     if (uid < FIRST_APPLICATION_UID || ksu_is_manager_uid(uid) || ksu_is_uid_granted_root(uid))
         return 0;
 
-    filename_user = (const char __user **)&PT_REGS_PARM2(regs);
-    if (!filename_user || !*filename_user)
+    addr = untagged_addr((unsigned long)PT_REGS_PARM2(regs));
+    if (!addr)
         return 0;
 
     memset(path, 0, sizeof(path));
-    ret = strncpy_from_user_nofault(path, *filename_user, sizeof(path) - 1);
+    ret = strncpy_from_user_nofault(path, (const void __user *)addr, sizeof(path) - 1);
     if (ret <= 0)
         return 0;
 
@@ -144,7 +144,7 @@ long ksu_handle_stat_vfs_hide(int orig_nr, struct pt_regs *regs)
 
 long ksu_handle_faccessat_vfs_hide(int orig_nr, struct pt_regs *regs)
 {
-    const char __user **filename_user;
+    unsigned long addr;
     char path[256];
     long ret;
     uid_t uid = current_uid().val;
@@ -152,12 +152,12 @@ long ksu_handle_faccessat_vfs_hide(int orig_nr, struct pt_regs *regs)
     if (uid < FIRST_APPLICATION_UID || ksu_is_manager_uid(uid) || ksu_is_uid_granted_root(uid))
         return 0;
 
-    filename_user = (const char __user **)&PT_REGS_PARM2(regs);
-    if (!filename_user || !*filename_user)
+    addr = untagged_addr((unsigned long)PT_REGS_PARM2(regs));
+    if (!addr)
         return 0;
 
     memset(path, 0, sizeof(path));
-    ret = strncpy_from_user_nofault(path, *filename_user, sizeof(path) - 1);
+    ret = strncpy_from_user_nofault(path, (const void __user *)addr, sizeof(path) - 1);
     if (ret <= 0)
         return 0;
 
@@ -171,7 +171,7 @@ long ksu_handle_faccessat_vfs_hide(int orig_nr, struct pt_regs *regs)
 
 long ksu_handle_openat_vfs_hide(int orig_nr, struct pt_regs *regs)
 {
-    const char __user **filename_user;
+    unsigned long addr;
     char path[256];
     long ret;
     uid_t uid = current_uid().val;
@@ -179,12 +179,12 @@ long ksu_handle_openat_vfs_hide(int orig_nr, struct pt_regs *regs)
     if (uid < FIRST_APPLICATION_UID || ksu_is_manager_uid(uid) || ksu_is_uid_granted_root(uid))
         return 0;
 
-    filename_user = (const char __user **)&PT_REGS_PARM2(regs);
-    if (!filename_user || !*filename_user)
+    addr = untagged_addr((unsigned long)PT_REGS_PARM2(regs));
+    if (!addr)
         return 0;
 
     memset(path, 0, sizeof(path));
-    ret = strncpy_from_user_nofault(path, *filename_user, sizeof(path) - 1);
+    ret = strncpy_from_user_nofault(path, (const void __user *)addr, sizeof(path) - 1);
     if (ret <= 0)
         return 0;
 
