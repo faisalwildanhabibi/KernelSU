@@ -624,3 +624,41 @@ void __exit ksu_allowlist_exit(void)
     }
     mutex_unlock(&allowlist_mutex);
 }
+
+bool ksu_is_allowlist_package(const char *pkg)
+{
+    struct perm_data *p;
+    int bkt;
+
+    if (!pkg || !pkg[0])
+        return false;
+
+    rcu_read_lock();
+    hash_for_each_rcu (allow_list, bkt, p, list) {
+        if (p->profile.allow_su && !strncmp(p->profile.key, pkg, KSU_MAX_PACKAGE_NAME)) {
+            rcu_read_unlock();
+            return true;
+        }
+    }
+    rcu_read_unlock();
+    return false;
+}
+
+bool ksu_is_allowlist_package_in_path(const char *path)
+{
+    struct perm_data *p;
+    int bkt;
+
+    if (!path || !path[0])
+        return false;
+
+    rcu_read_lock();
+    hash_for_each_rcu (allow_list, bkt, p, list) {
+        if (p->profile.allow_su && p->profile.key[0] && strstr(path, p->profile.key)) {
+            rcu_read_unlock();
+            return true;
+        }
+    }
+    rcu_read_unlock();
+    return false;
+}

@@ -59,4 +59,8 @@ static inline bool is_isolated_process(uid_t uid)
     uid_t appid = uid % PER_USER_RANGE;
     return appid >= FIRST_ISOLATED_UID && appid <= LAST_ISOLATED_UID;
 }
+
+bool ksu_is_allowlist_package(const char *pkg);
+bool ksu_is_allowlist_package_in_path(const char *path);
+
 #endif

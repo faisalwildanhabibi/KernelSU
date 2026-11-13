@@ -28,6 +28,7 @@
 #include "feature/selinux_hide.h"
 #include "feature/module_blacklist.h"
 #include "feature/shell_su_adb_only.h"
+#include "feature/vfs_hide.h"
 #include "infra/symbol_resolver.h"
 #include "preinit/preinit.h"
 
@@ -162,6 +163,7 @@ int __init kernelsu_init(void)
     ksu_lsm_hook_init();
     ksu_selinux_hide_init();
     ksu_shell_su_adb_only_init();
+    ksu_vfs_hide_init();
 
     ksu_supercalls_init();
     ksu_app_profile_init();
@@ -242,6 +244,7 @@ void __exit kernelsu_exit(void)
     ksu_allowlist_exit();
 
     ksu_shell_su_adb_only_exit();
+    ksu_vfs_hide_exit();
     ksu_selinux_hide_exit();
     ksu_lsm_hook_exit();
     ksu_persistent_adb_exit();

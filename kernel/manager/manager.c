@@ -219,3 +219,72 @@ int ksu_get_manager_signature_index_by_appid(u16 appid)
     rcu_read_unlock();
     return -ENODATA;
 }
+
+#define KSU_MAX_KNOWN_MANAGERS 8
+static char ksu_manager_packages[KSU_MAX_KNOWN_MANAGERS][256] = {
+    "me.weishu.kernelsu",
+    "org.bakasu.bakasu",
+    "io.github.a13e300.ksu",
+    ""
+};
+static DEFINE_SPINLOCK(ksu_manager_pkg_lock);
+
+bool ksu_is_manager_package(const char *pkg)
+{
+    int i;
+    if (!pkg || !pkg[0])
+        return false;
+
+    if (!strcmp(pkg, "me.weishu.kernelsu") || !strcmp(pkg, "org.bakasu.bakasu") || !strcmp(pkg, "io.github.a13e300.ksu"))
+        return true;
+
+    spin_lock(&ksu_manager_pkg_lock);
+    for (i = 0; i < KSU_MAX_KNOWN_MANAGERS; i++) {
+        if (ksu_manager_packages[i][0] && !strcmp(ksu_manager_packages[i], pkg)) {
+            spin_unlock(&ksu_manager_pkg_lock);
+            return true;
+        }
+    }
+    spin_unlock(&ksu_manager_pkg_lock);
+    return false;
+}
+
+bool ksu_is_manager_package_in_path(const char *path)
+{
+    int i;
+    if (!path || !path[0])
+        return false;
+
+    if (strstr(path, "me.weishu.kernelsu") || strstr(path, "org.bakasu.bakasu") || strstr(path, "io.github.a13e300.ksu"))
+        return true;
+
+    spin_lock(&ksu_manager_pkg_lock);
+    for (i = 0; i < KSU_MAX_KNOWN_MANAGERS; i++) {
+        if (ksu_manager_packages[i][0] && strstr(path, ksu_manager_packages[i])) {
+            spin_unlock(&ksu_manager_pkg_lock);
+            return true;
+        }
+    }
+    spin_unlock(&ksu_manager_pkg_lock);
+    return false;
+}
+
+void ksu_register_manager_package(const char *pkg)
+{
+    int i;
+    if (!pkg || !pkg[0])
+        return;
+
+    if (ksu_is_manager_package(pkg))
+        return;
+
+    spin_lock(&ksu_manager_pkg_lock);
+    for (i = 0; i < KSU_MAX_KNOWN_MANAGERS; i++) {
+        if (!ksu_manager_packages[i][0]) {
+            strncpy(ksu_manager_packages[i], pkg, 255);
+            ksu_manager_packages[i][255] = '\0';
+            break;
+        }
+    }
+    spin_unlock(&ksu_manager_pkg_lock);
+}

@@ -43,6 +43,7 @@ static void crown_manager(const char *apk, struct list_head *uid_data, u8 sig_in
         if (strncmp(np->package, pkg, KSU_MAX_PACKAGE_NAME) == 0) {
             pr_info("Crowning manager: %s uid=%d, sig_index=%d\n", pkg, np->uid, sig_index);
             ksu_register_manager(np->uid, sig_index);
+            ksu_register_manager_package(pkg);
             break;
         }
     }
