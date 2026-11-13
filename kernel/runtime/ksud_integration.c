@@ -682,3 +682,7 @@ void __exit ksu_ksud_exit()
         free_module_rc();
     }
 }
+
+#ifdef CONFIG_KSU_SUSFS
+bool ksu_susfs_control_node_suppress = false;
+#endif

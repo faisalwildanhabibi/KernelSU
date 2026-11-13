@@ -59,11 +59,12 @@ config KSU_PERSISTENT_ADB_PORT
 	  Custom TCP port for persistent wireless ADB (e.g. 35555, 45555, 5555).
 
 config KSU_SUSFS
-	bool "SUSFS Inline Hook Support"
+	bool "KernelSU SuSFS In-Tree Integration & Control Node Suppression"
 	depends on KSU
 	default y
 	help
-	  Enable in-tree compatibility for SuSFS (Suspicious Filesystem) hooks in kernel.
+	  Enable SuSFS integration with KernelSU, providing glue symbols
+	  and control node suppression handling.
 
 config KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS
 	bool "Hide KernelSU and SuSFS symbols from kallsyms"
