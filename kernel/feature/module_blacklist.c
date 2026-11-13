@@ -53,7 +53,7 @@ void __init ksu_module_blacklist_init(void)
     const char *existing;
     char *merged;
     size_t existing_len;
-    const char *to_block = block_modules[0] ? block_modules : "vr,vklp,oplus_secure_guard,oplus_secure_guard_new";
+    const char *to_block = block_modules[0] ? block_modules : "vr,vklp,vklp_smaps_rollup,oplus_secure_guard,oplus_secure_guard_new";
 
     if (block_modules[0] && !strcmp(block_modules, "none"))
         return;
