@@ -442,13 +442,22 @@ static bool add_xperm_rule(struct policydb *db, const char *s, const char *t, co
         }
     }
 
-    u16 low, high;
+    u16 low = 0, high = 0xFFFF;
+    int n;
 
     if (range) {
         if (strchr(range, '-')) {
-            sscanf(range, "%hx-%hx", &low, &high);
+            n = sscanf(range, "%hx-%hx", &low, &high);
+            if (n != 2 || high < low) {
+                pr_err("sepol: bad xperm range '%s'\n", range);
+                return false;
+            }
         } else {
-            sscanf(range, "%hx", &low);
+            n = sscanf(range, "%hx", &low);
+            if (n != 1) {
+                pr_err("sepol: bad xperm value '%s'\n", range);
+                return false;
+            }
             high = low;
         }
     } else {
@@ -668,7 +677,7 @@ static bool add_type(struct policydb *db, const char *type_name, bool attr)
         return true;
     }
 
-    u32 value = ++db->p_types.nprim;
+    u32 value = db->p_types.nprim + 1;
     type = (struct type_datum *)kzalloc(sizeof(struct type_datum), GFP_KERNEL);
     if (!type) {
         pr_err("add_type: alloc type_datum failed.\n");
@@ -682,13 +691,18 @@ static bool add_type(struct policydb *db, const char *type_name, bool attr)
     char *key = kstrdup(type_name, GFP_KERNEL);
     if (!key) {
         pr_err("add_type: alloc key failed.\n");
+        kfree(type);
         return false;
     }
 
     if (symtab_insert(&db->p_types, key, type)) {
         pr_err("add_type: insert symtab failed.\n");
+        kfree(key);
+        kfree(type);
         return false;
     }
+
+    db->p_types.nprim = value;
 
     struct ebitmap *new_type_attr_map_array =
         ksu_kvrealloc(db->type_attr_map_array, value * sizeof(struct ebitmap), (value - 1) * sizeof(struct ebitmap));
