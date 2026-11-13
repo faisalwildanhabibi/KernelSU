@@ -32,6 +32,12 @@ const char *ksu_get_dynamic_manager_hash(void)
     return dynamic_manager.hash;
 }
 
+apk_sign_key_t ksu_get_dynamic_manager_sign(void)
+{
+    apk_sign_key_t sign_key = { .size = dynamic_manager.size, .sha256 = dynamic_manager.hash };
+    return sign_key;
+}
+
 int ksu_handle_dynamic_manager(struct ksu_dynamic_manager_cmd *cmd)
 {
     int i;
@@ -56,12 +62,14 @@ int ksu_handle_dynamic_manager(struct ksu_dynamic_manager_cmd *cmd)
             }
         }
 
+        if (dynamic_manager.is_set) {
+            ksu_unregister_manager_by_signature_index(KSU_SIGNATURE_INDEX_DYNAMIC_MANAGER);
+        }
+
         dynamic_manager.size = cmd->size;
         memcpy(dynamic_manager.hash, cmd->hash, 64);
         dynamic_manager.hash[64] = '\0';
         dynamic_manager.is_set = 1;
-
-        ksu_set_manager_appid(KSU_INVALID_APPID);
 
         pr_info("dynamic_manager: updated size=0x%x, hash=%.16s...\n", cmd->size, cmd->hash);
         track_throne(false);
@@ -80,7 +88,7 @@ int ksu_handle_dynamic_manager(struct ksu_dynamic_manager_cmd *cmd)
         dynamic_manager.is_set = 0;
         memset(dynamic_manager.hash, 0, sizeof(dynamic_manager.hash));
         dynamic_manager.size = 0;
-        ksu_set_manager_appid(KSU_INVALID_APPID);
+        ksu_unregister_manager_by_signature_index(KSU_SIGNATURE_INDEX_DYNAMIC_MANAGER);
         pr_info("dynamic_manager: settings reset to default\n");
         break;
 

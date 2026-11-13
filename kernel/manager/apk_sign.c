@@ -20,6 +20,8 @@
 #endif
 
 #include "manager/apk_sign.h"
+#include "manager/manager_sign.h"
+#include "manager/manager_identity.h"
 #include "feature/dynamic_manager.h"
 #include "uapi/app_profile.h"
 #include "klog.h" // IWYU pragma: keep
@@ -27,6 +29,15 @@
 struct sdesc {
     struct shash_desc shash;
     char ctx[];
+};
+
+static apk_sign_key_t apk_sign_keys[] = {
+    { EXPECTED_SIZE_BAKASU, EXPECTED_HASH_BAKASU },     /* Baka-SU/BakaSU */
+    { EXPECTED_SIZE_OFFICIAL, EXPECTED_HASH_OFFICIAL }, /* tiann/KernelSU Official */
+    { EXPECTED_SIZE_KOWX712, EXPECTED_HASH_KOWX712 },   /* KOWX712/KernelSU */
+#if defined(EXPECTED_SIZE) && defined(EXPECTED_HASH)
+    { EXPECTED_SIZE, EXPECTED_HASH },                   /* Custom from Kbuild */
+#endif
 };
 
 static struct sdesc *init_sdesc(struct crypto_shash *alg)
@@ -95,10 +106,12 @@ static bool read_length_prefixed_end(struct file *fp, loff_t *pos, loff_t contai
     return true;
 }
 
-static bool check_block(struct file *fp, loff_t *pos, loff_t block_end, unsigned expected_size,
-                        const char *expected_sha256)
+static bool check_block(struct file *fp, loff_t *pos, loff_t block_end, u8 *matched_index)
 {
+    u8 i;
+    apk_sign_key_t sign_key;
     loff_t signers_end, signer_end, signed_data_end, digests_end, certificates_end;
+    bool signature_valid = false;
     u32 certificate_size;
 
     // v2 block: signers sequence -> first signer -> signed data -> digests
@@ -117,9 +130,6 @@ static bool check_block(struct file *fp, loff_t *pos, loff_t block_end, unsigned
         return false;
 
 #define CERT_MAX_LENGTH 1024
-    if (certificate_size != expected_size)
-        return false;
-
     if (certificate_size > CERT_MAX_LENGTH) {
         pr_info("cert length overlimit\n");
         return false;
@@ -139,11 +149,31 @@ static bool check_block(struct file *fp, loff_t *pos, loff_t block_end, unsigned
     hash_str[SHA256_DIGEST_SIZE * 2] = '\0';
 
     bin2hex(hash_str, digest, SHA256_DIGEST_SIZE);
-    pr_info("sha256: %s, expected: %s\n", hash_str, expected_sha256);
-    return strcmp(expected_sha256, hash_str) == 0;
+    pr_info("sha256: %s\n", hash_str);
+
+    for (i = 0; i < ARRAY_SIZE(apk_sign_keys); i++) {
+        sign_key = apk_sign_keys[i];
+        if (certificate_size == sign_key.size && strcmp(sign_key.sha256, hash_str) == 0) {
+            if (matched_index)
+                *matched_index = i;
+            signature_valid = true;
+            break;
+        }
+    }
+
+    if (!signature_valid && ksu_is_dynamic_manager_enabled()) {
+        sign_key = ksu_get_dynamic_manager_sign();
+        if (certificate_size == sign_key.size && strcmp(sign_key.sha256, hash_str) == 0) {
+            if (matched_index)
+                *matched_index = KSU_SIGNATURE_INDEX_DYNAMIC_MANAGER;
+            signature_valid = true;
+        }
+    }
+
+    return signature_valid;
 }
 
-static __always_inline bool check_v2_signature(char *path, unsigned expected_size, const char *expected_sha256)
+static __always_inline bool check_v2_signature(char *path, u8 *signature_index)
 {
     unsigned char buffer[0x10] = { 0 };
     u32 cd_offset, cd_size;
@@ -154,6 +184,7 @@ static __always_inline bool check_v2_signature(char *path, unsigned expected_siz
 
     bool v2_signing_valid = false;
     int v2_signing_blocks = 0;
+    u8 matched_index = 0;
 
     int i;
     struct file *fp = ksu_filp_open_nonotify(path, O_RDONLY | O_NOATIME);
@@ -229,8 +260,6 @@ static __always_inline bool check_v2_signature(char *path, unsigned expected_siz
         goto clean;
 
     // Scan every length-prefixed pair, matching AOSP's signing block parser
-    // Each valid pair consumes an 8-byte length plus at least a 4-byte ID, so
-    // malformed entries fail below instead of spinning in place.
     while (pos < pairs_end) {
         uint32_t id;
         u64 size_of_pair;
@@ -247,9 +276,8 @@ static __always_inline bool check_v2_signature(char *path, unsigned expected_siz
 
         if (id == 0x7109871au) {
             v2_signing_blocks++;
-            v2_signing_valid = check_block(fp, &pos, pair_end, expected_size, expected_sha256);
+            v2_signing_valid = check_block(fp, &pos, pair_end, &matched_index);
         } else if (id != 0x42726577u) { // APK verity padding
-            // https://cs.android.com/android/platform/superproject/+/android-latest-release:tools/apksig/src/main/java/com/android/apksig/internal/apk/ApkSigningBlockUtils.java;l=102;drc=ebe4dfd4fd6550c949a6c7c2427484bf5e96500b
 #ifdef CONFIG_KSU_DEBUG
             pr_info("Unexpected signature block id: 0x%08x\n", id);
 #endif
@@ -272,19 +300,25 @@ invalid:
 clean:
     filp_close(fp, 0);
 
-    return v2_signing_valid;
+    if (v2_signing_valid) {
+        if (signature_index) {
+            *signature_index = matched_index;
+        }
+        return true;
+    }
+
+    return false;
 }
 
 #ifdef CONFIG_KSU_DEBUG
 
 int ksu_debug_manager_appid = -1;
 
-#include "manager/manager_identity.h"
-
 static int set_expected_size(const char *val, const struct kernel_param *kp)
 {
     int rv = param_set_uint(val, kp);
-    ksu_set_manager_appid(ksu_debug_manager_appid);
+    ksu_unregister_manager_by_signature_index(KSU_SIGNATURE_INDEX_KSU_DEBUG);
+    ksu_register_manager(ksu_debug_manager_appid, KSU_SIGNATURE_INDEX_KSU_DEBUG);
     pr_info("ksu_manager_appid set to %d\n", ksu_debug_manager_appid);
     return rv;
 }
@@ -297,6 +331,46 @@ static struct kernel_param_ops expected_size_ops = {
 module_param_cb(ksu_debug_manager_appid, &expected_size_ops, &ksu_debug_manager_appid, S_IRUSR | S_IWUSR);
 
 #endif
+
+// /data/app/XXXXX/<PACKAGE_NAME>-YYY/base.apk
+int get_pkg_from_apk_path(char *pkg, const char *path)
+{
+    int len = strlen(path);
+    if (len >= KSU_MAX_PACKAGE_NAME || len < 1)
+        return -1;
+
+    const char *last_slash = NULL;
+    const char *second_last_slash = NULL;
+
+    int i;
+    for (i = len - 1; i >= 0; i--) {
+        if (path[i] == '/') {
+            if (!last_slash) {
+                last_slash = &path[i];
+            } else {
+                second_last_slash = &path[i];
+                break;
+            }
+        }
+    }
+
+    if (!last_slash || !second_last_slash)
+        return -1;
+
+    const char *last_hyphen = strchr(second_last_slash, '-');
+    if (!last_hyphen || last_hyphen > last_slash)
+        return -1;
+
+    int pkg_len = last_hyphen - second_last_slash - 1;
+    if (pkg_len >= KSU_MAX_PACKAGE_NAME || pkg_len <= 0)
+        return -1;
+
+    // Copying the package name
+    strncpy(pkg, second_last_slash + 1, pkg_len);
+    pkg[pkg_len] = '\0';
+
+    return 0;
+}
 
 // /data/app/XXXXX/<PACKAGE_NAME>-YYY, which contains base.apk
 int get_pkg_from_apk_dir_path(char *pkg, const char *path)
@@ -326,21 +400,7 @@ int get_pkg_from_apk_dir_path(char *pkg, const char *path)
 
 bool is_manager_apk_with_sig(char *path, u8 *sig_index)
 {
-    if (check_v2_signature(path, EXPECTED_SIZE, EXPECTED_HASH)) {
-        if (sig_index)
-            *sig_index = 0;
-        return true;
-    }
-
-    if (ksu_is_dynamic_manager_enabled()) {
-        if (check_v2_signature(path, ksu_get_dynamic_manager_size(), ksu_get_dynamic_manager_hash())) {
-            if (sig_index)
-                *sig_index = KSU_SIGNATURE_INDEX_DYNAMIC_MANAGER;
-            return true;
-        }
-    }
-
-    return false;
+    return check_v2_signature(path, sig_index);
 }
 
 bool is_manager_apk(char *path)

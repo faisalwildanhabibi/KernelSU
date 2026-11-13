@@ -5,6 +5,7 @@
 
 bool is_manager_apk(char *path);
 bool is_manager_apk_with_sig(char *path, u8 *sig_index);
+int get_pkg_from_apk_path(char *pkg, const char *path);
 int get_pkg_from_apk_dir_path(char *pkg, const char *path);
 
 #endif

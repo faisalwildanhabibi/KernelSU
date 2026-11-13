@@ -2,6 +2,7 @@
 #define __KSU_H_DYNAMIC_MANAGER
 
 #include <linux/types.h>
+#include "manager/manager_sign.h"
 #include "uapi/supercall.h"
 
 struct dynamic_manager_config {
@@ -14,5 +15,6 @@ int ksu_handle_dynamic_manager(struct ksu_dynamic_manager_cmd *cmd);
 bool ksu_is_dynamic_manager_enabled(void);
 unsigned int ksu_get_dynamic_manager_size(void);
 const char *ksu_get_dynamic_manager_hash(void);
+apk_sign_key_t ksu_get_dynamic_manager_sign(void);
 
 #endif
