@@ -1,0 +1,6 @@
+id=ksu-pms-guard
+name=KernelSU Dual-World PMS Guard
+version=v1.0.0
+versionCode=100
+author=faisalwildanhabibi & KernelSU
+description=Zero-config Dual-World Default-Deny package manager hiding for KernelSU and ZygiskNext.
